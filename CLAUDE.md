@@ -20,6 +20,31 @@ Flip Server Exercise — a Python service that uses [Temporal.io](https://tempor
 - Packaged with [Poetry](https://python-poetry.org/) for easy installation
 - `README.md` with instructions on how to run the code
 
+**Requirements:**
+1. Accept arbitrary number of strings to flip
+2. Reliably flip all of them
+3. Add temporal `query` for number of strings flipped so far (measures progress)
+4. Add temporal `query` for number of `HTTP 200 OK` responses received so far from the unreliable server (measures how much real work we caused the flip server to do)
+
+**Using the Queries:** `client.py` must run an asynchronous polling loop that queries the workflow and prints progress every `n` seconds.
+
+**Expected CLI Usage:**
+```bash
+$ poetry run python exercise/client.py "hello" "world"
+> "olleh" "dlrow"
+```
+
+**Bonus Points (ordered):**
+1. Implement FastAPI server that wraps Temporal, i.e. `POST /flip` with JSON body `["hello", "world"]` returns `["olleh", "dlrow"]`
+2. Containerize the service
+3. Write Kubernetes deployment files
+
+**Flip Server API:**
+- Endpoint: `POST http://127.0.0.1:8000/flip`
+- Content-Type: `application/json`
+- Body: JSON array of strings, e.g. `["hello", "world"]`
+- Response: JSON array of flipped strings, e.g. `["olleh", "dlrow"]`
+
 ## Run Commands
 
 ```bash
