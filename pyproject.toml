@@ -10,6 +10,7 @@ python = ">=3.11,<3.13"
 fastapi = "^0.115.5"
 uvicorn = "^0.32.1"
 temporalio = "^1.8.0"
+httpx = "^0.28.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -17,6 +18,8 @@ black = "^24.10.0"
 mypy = "^1.13.0"
 pylint = "^3.3.1"
 isort = "^5.13.2"
+pytest = "^8.0.0"
+pytest-asyncio = "^0.25.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -24,3 +27,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pylint.messages_control]
 disable = "missing-docstring,too-few-public-methods"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

@@ -1,6 +1,7 @@
 import asyncio
 import logging
-import warnings
+from collections.abc import Callable
+from typing import Any
 
 import temporalio.client
 import temporalio.worker
@@ -10,28 +11,21 @@ from exercise import tmprl
 
 interrupt_event = asyncio.Event()
 
-ACTIVITIES = []  # TODO add the activities here
+ACTIVITIES: list[Callable[..., Any]] = [tmprl.flip_batch]
 WORKFLOWS = [tmprl.Flip]
 
 
-async def main():
-    # Uncomment the line below to see logging
+async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
-    # Start client
     client = await temporalio.client.Client.connect("localhost:7233")
-    if len(ACTIVITIES) == 0:
-        warnings.warn(
-            "No activities specified, worker will not be able to execute any non-workflow tasks"
-        )
-    # Run a worker for the workflow
+
     async with temporalio.worker.Worker(
         client,
         task_queue="default",
         workflows=WORKFLOWS,
         activities=ACTIVITIES,
     ):
-        # Wait until interrupted
         print("Worker started, ctrl+c to exit")
         await interrupt_event.wait()
         print("Shutting down")
