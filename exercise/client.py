@@ -1,10 +1,13 @@
 import asyncio
+import os
 import random
 import sys
 
 import temporalio.client
 
 from exercise import tmprl
+
+TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 POLL_INTERVAL_SECONDS = 2
 
@@ -29,7 +32,7 @@ async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
 
 async def flip(to_flip: list[str]) -> list[str]:
     client = await temporalio.client.Client.connect(
-        target_host="localhost:7233",
+        target_host=TEMPORAL_HOST,
     )
 
     handle = await client.start_workflow(

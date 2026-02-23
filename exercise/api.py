@@ -1,3 +1,4 @@
+import os
 import random
 from dataclasses import dataclass, field
 
@@ -7,6 +8,8 @@ from fastapi import FastAPI
 from pydantic import RootModel
 
 from exercise import tmprl
+
+TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 app = FastAPI(title="Flip API")
 
@@ -21,7 +24,7 @@ _holder = _ClientHolder()
 
 async def get_temporal_client() -> temporalio.client.Client:
     if _holder.client is None:
-        _holder.client = await temporalio.client.Client.connect("localhost:7233")
+        _holder.client = await temporalio.client.Client.connect(TEMPORAL_HOST)
     return _holder.client
 
 

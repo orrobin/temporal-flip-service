@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import logging
+import os
 from datetime import timedelta
 
 import httpx
@@ -11,7 +12,7 @@ import temporalio.workflow
 
 logger = logging.getLogger(__name__)
 
-FLIP_SERVER_URL = "http://127.0.0.1:8000/flip"
+FLIP_SERVER_URL = os.environ.get("FLIP_SERVER_URL", "http://127.0.0.1:8000/flip")
 MAX_BATCH_SIZE = 10
 ACTIVITY_START_TO_CLOSE_TIMEOUT = timedelta(seconds=30)
 
