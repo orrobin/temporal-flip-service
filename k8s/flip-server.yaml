@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flip-server
+  namespace: flip
+  labels:
+    app: flip-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flip-server
+  template:
+    metadata:
+      labels:
+        app: flip-server
+    spec:
+      containers:
+        - name: flip-server
+          image: flip-exercise:latest
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "exercise.server:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flip-server
+  namespace: flip
+  labels:
+    app: flip-server
+spec:
+  selector:
+    app: flip-server
+  ports:
+    - port: 8000
+      targetPort: 8000

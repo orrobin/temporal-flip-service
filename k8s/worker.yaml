@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: flip
+  labels:
+    app: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      initContainers:
+        - name: wait-for-temporal
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z temporal 7233; do
+                echo "Waiting for temporal..."
+                sleep 2
+              done
+      containers:
+        - name: worker
+          image: flip-exercise:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "exercise.worker"]
+          env:
+            - name: TEMPORAL_HOST
+              value: "temporal:7233"
+            - name: FLIP_SERVER_URL
+              value: "http://flip-server:8000/flip"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
