@@ -16,6 +16,7 @@ MAX_BATCH_SIZE = 10
 ACTIVITY_START_TO_CLOSE_TIMEOUT = timedelta(seconds=30)
 
 PARTIAL_FAILURE_MARKER = "-"
+VALID_CHARS = set("abcdefghijklmnopqrstuvwxyz")
 
 
 @dataclasses.dataclass
@@ -74,8 +75,20 @@ class Flip:
         """Number of HTTP 200 OK responses received from the flip server."""
         return self._ok_responses
 
+    @staticmethod
+    def _validate_strings(strings: list[str]) -> None:
+        """Validate that all strings contain only lowercase a-z."""
+        invalid = [s for s in strings if not s or not set(s).issubset(VALID_CHARS)]
+        if invalid:
+            raise temporalio.exceptions.ApplicationError(
+                f"Invalid strings (only lowercase a-z allowed): {invalid}",
+                non_retryable=True,
+            )
+
     @temporalio.workflow.run
     async def run(self, params: Params) -> Result:
+        self._validate_strings(params.strings)
+
         total = len(params.strings)
         results: list[str | None] = [None] * total
         pending: list[tuple[int, str]] = list(enumerate(params.strings))

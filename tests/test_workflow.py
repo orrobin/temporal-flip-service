@@ -1,5 +1,6 @@
 import pytest
 import temporalio.activity
+import temporalio.client
 import temporalio.testing
 import temporalio.worker
 
@@ -46,7 +47,20 @@ async def test_workflow_single_batch() -> None:
 @pytest.mark.asyncio
 async def test_workflow_multi_batch() -> None:
     """12 strings require 2 batches (10 + 2)."""
-    strings = [f"word{i}" for i in range(12)]
+    strings = [
+        "alpha",
+        "bravo",
+        "charlie",
+        "delta",
+        "echo",
+        "foxtrot",
+        "golf",
+        "hotel",
+        "india",
+        "juliet",
+        "kilo",
+        "lima",
+    ]
 
     async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
         async with temporalio.worker.Worker(
@@ -158,3 +172,22 @@ async def test_workflow_preserves_order() -> None:
                 task_queue="test",
             )
             assert result.strings == [s[::-1] for s in strings]
+
+
+@pytest.mark.asyncio
+async def test_workflow_rejects_invalid_strings() -> None:
+    """Strings with non-lowercase chars should fail fast."""
+    async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
+        async with temporalio.worker.Worker(
+            env.client,
+            task_queue="test",
+            workflows=[Flip],
+            activities=[mock_flip_batch_always_succeeds],
+        ):
+            with pytest.raises(temporalio.client.WorkflowFailureError):
+                await env.client.execute_workflow(
+                    Flip.run,
+                    Params(strings=["Hello", "world"]),
+                    id="test-invalid",
+                    task_queue="test",
+                )

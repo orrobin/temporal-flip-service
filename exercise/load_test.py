@@ -35,27 +35,11 @@ async def run_workflow(
     return workflow_id, strings, result.strings, len(result.strings), ok_responses
 
 
-async def main() -> None:
-    client = await temporalio.client.Client.connect("localhost:7233")
-
-    # Generate all inputs upfront
-    workflows: list[tuple[str, list[str]]] = [
-        (f"load-test-{i}", generate_random_strings(STRINGS_PER_WORKFLOW, STRING_LENGTH))
-        for i in range(NUM_WORKFLOWS)
-    ]
-
-    print(
-        f"Starting {NUM_WORKFLOWS} workflows, "
-        f"each with {STRINGS_PER_WORKFLOW} strings..."
-    )
-    start = time.monotonic()
-
-    # Launch all workflows concurrently
-    tasks = [
-        asyncio.create_task(run_workflow(client, wf_id, strings))
-        for wf_id, strings in workflows
-    ]
-
+async def collect_results(
+    tasks: list[asyncio.Task[tuple[str, list[str], list[str], int, int]]],
+    start: float,
+) -> tuple[int, int, int, int]:
+    """Collect workflow results, printing per-workflow stats. Returns counters."""
     completed = 0
     failed = 0
     mismatched = 0
@@ -72,9 +56,7 @@ async def main() -> None:
                 f"HTTP 200 responses: {ok_responses}"
             )
 
-            # Verify correctness: each output should be the reverse of its input
-            expected = [s[::-1] for s in inputs]
-            if outputs != expected:
+            if outputs != [s[::-1] for s in inputs]:
                 mismatched += 1
                 print(f"  MISMATCH in {wf_id}")
 
@@ -87,6 +69,32 @@ async def main() -> None:
         except Exception as exc:  # pylint: disable=broad-exception-caught
             failed += 1
             print(f"  FAILED: {exc}")
+
+    return completed, failed, mismatched, total_ok_responses
+
+
+async def main() -> None:
+    client = await temporalio.client.Client.connect("localhost:7233")
+
+    workflows: list[tuple[str, list[str]]] = [
+        (f"load-test-{i}", generate_random_strings(STRINGS_PER_WORKFLOW, STRING_LENGTH))
+        for i in range(NUM_WORKFLOWS)
+    ]
+
+    print(
+        f"Starting {NUM_WORKFLOWS} workflows, "
+        f"each with {STRINGS_PER_WORKFLOW} strings..."
+    )
+    start = time.monotonic()
+
+    tasks = [
+        asyncio.create_task(run_workflow(client, wf_id, strings))
+        for wf_id, strings in workflows
+    ]
+
+    completed, failed, mismatched, total_ok_responses = await collect_results(
+        tasks, start
+    )
 
     elapsed = time.monotonic() - start
     total_strings = NUM_WORKFLOWS * STRINGS_PER_WORKFLOW
