@@ -5,7 +5,7 @@ import time
 
 import temporalio.client
 
-from exercise import tmprl
+from exercise import workflows
 
 NUM_WORKFLOWS = 100
 STRINGS_PER_WORKFLOW = 100
@@ -25,13 +25,13 @@ async def run_workflow(
 ) -> tuple[str, list[str], list[str], int, int]:
     """Run a single workflow and return (id, input, output, flipped, ok_responses)."""
     handle = await client.start_workflow(
-        tmprl.Flip.run,
-        tmprl.Params(strings=strings),
+        workflows.Flip.run,
+        workflows.Params(strings=strings),
         id=workflow_id,
         task_queue="default",
     )
     result = await handle.result()
-    ok_responses = await handle.query(tmprl.Flip.ok_responses)
+    ok_responses = await handle.query(workflows.Flip.ok_responses)
     return workflow_id, strings, result.strings, len(result.strings), ok_responses
 
 

@@ -4,7 +4,7 @@ import temporalio.client
 import temporalio.testing
 import temporalio.worker
 
-from exercise.tmprl.workflow import BatchResult, Flip, Params
+from exercise.workflows.workflow import BatchResult, Flip, Params
 
 # Track call count to simulate partial failures then success
 _call_counter: int = 0

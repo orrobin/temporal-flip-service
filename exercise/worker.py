@@ -8,14 +8,14 @@ import temporalio.client
 import temporalio.worker
 import temporalio.workflow
 
-from exercise import tmprl
+from exercise import workflows
 
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 interrupt_event = asyncio.Event()
 
-ACTIVITIES: list[Callable[..., Any]] = [tmprl.flip_batch]
-WORKFLOWS = [tmprl.Flip]
+ACTIVITIES: list[Callable[..., Any]] = [workflows.flip_batch]
+WORKFLOWS = [workflows.Flip]
 
 
 async def main() -> None:

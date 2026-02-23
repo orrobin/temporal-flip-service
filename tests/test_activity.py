@@ -4,7 +4,7 @@ import httpx
 import pytest
 import temporalio.exceptions
 
-from exercise.tmprl.workflow import BatchResult, flip_batch
+from exercise.workflows.workflow import BatchResult, flip_batch
 
 
 @pytest.mark.asyncio
@@ -14,7 +14,7 @@ async def test_flip_batch_success() -> None:
         json=["olleh", "dlrow"],
         request=httpx.Request("POST", "http://test"),
     )
-    with patch("exercise.tmprl.workflow.httpx.AsyncClient") as mock_client_cls:
+    with patch("exercise.workflows.workflow.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -33,7 +33,7 @@ async def test_flip_batch_partial_failure() -> None:
         json=["olleh", "-"],
         request=httpx.Request("POST", "http://test"),
     )
-    with patch("exercise.tmprl.workflow.httpx.AsyncClient") as mock_client_cls:
+    with patch("exercise.workflows.workflow.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -51,7 +51,7 @@ async def test_flip_batch_server_error_raises() -> None:
         json={"detail": "Random immediate failure occurred."},
         request=httpx.Request("POST", "http://test"),
     )
-    with patch("exercise.tmprl.workflow.httpx.AsyncClient") as mock_client_cls:
+    with patch("exercise.workflows.workflow.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -70,7 +70,7 @@ async def test_flip_batch_bad_request_non_retryable() -> None:
         },
         request=httpx.Request("POST", "http://test"),
     )
-    with patch("exercise.tmprl.workflow.httpx.AsyncClient") as mock_client_cls:
+    with patch("exercise.workflows.workflow.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)

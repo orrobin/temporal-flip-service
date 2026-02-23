@@ -5,7 +5,7 @@ import sys
 
 import temporalio.client
 
-from exercise import tmprl
+from exercise import workflows
 
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
@@ -17,8 +17,8 @@ async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
     while True:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
         try:
-            flipped = await handle.query(tmprl.Flip.strings_flipped)
-            ok_responses = await handle.query(tmprl.Flip.ok_responses)
+            flipped = await handle.query(workflows.Flip.strings_flipped)
+            ok_responses = await handle.query(workflows.Flip.ok_responses)
             print(
                 f"[progress] strings flipped: {flipped} | "
                 f"HTTP 200 responses: {ok_responses}"
@@ -36,8 +36,8 @@ async def flip(to_flip: list[str]) -> list[str]:
     )
 
     handle = await client.start_workflow(
-        tmprl.Flip.run,
-        tmprl.Params(strings=to_flip),
+        workflows.Flip.run,
+        workflows.Params(strings=to_flip),
         id=f"flip-{random.randint(0, 100000)}",
         task_queue="default",
     )
@@ -45,7 +45,7 @@ async def flip(to_flip: list[str]) -> list[str]:
     poll_task = asyncio.create_task(poll_progress(handle))
 
     try:
-        result: tmprl.Result = await handle.result()
+        result: workflows.Result = await handle.result()
     finally:
         poll_task.cancel()
         try:
@@ -55,7 +55,7 @@ async def flip(to_flip: list[str]) -> list[str]:
 
     print(
         f"[done] strings flipped: {len(result.strings)} | "
-        f"HTTP 200 responses: {await handle.query(tmprl.Flip.ok_responses)}"
+        f"HTTP 200 responses: {await handle.query(workflows.Flip.ok_responses)}"
     )
 
     return result.strings

@@ -110,9 +110,9 @@ poetry run mypy exercise/
 
 - **`exercise/client.py`** — CLI client that starts a Temporal workflow and returns results. Should include query polling for progress.
 
-- **`exercise/tmprl/workflow.py`** — Temporal workflow and activity definitions. Core implementation file.
+- **`exercise/workflows/workflow.py`** — Temporal workflow and activity definitions. Core implementation file.
 
-- **`exercise/tmprl/__init__.py`** — Package exports (`Flip`, `Params`, `Result`).
+- **`exercise/workflows/__init__.py`** — Package exports (`Flip`, `Params`, `Result`).
 
 - **`pyproject.toml`** — Poetry project configuration and dependencies.
 
@@ -233,8 +233,8 @@ Reason: [Brief justification]
 ```
 
 #### Existing Patterns in This Codebase
-- **Temporal Workflow**: `exercise/tmprl/workflow.py` — `Flip` workflow definition
-- **Dataclass DTOs**: `Params`, `Result` in `exercise/tmprl/workflow.py`
+- **Temporal Workflow**: `exercise/workflows/workflow.py` — `Flip` workflow definition
+- **Dataclass DTOs**: `Params`, `Result` in `exercise/workflows/workflow.py`
 - **Worker Registration**: `exercise/worker.py` — `ACTIVITIES` and `WORKFLOWS` lists
 
 ### 4. Performance & Scalability
@@ -363,4 +363,4 @@ Test naming convention: `test_<function>_<scenario>_<expected_result>`
 - `README.md` — Exercise description, requirements, and server quirks
 - `pyproject.toml` — Poetry config, dependencies, and tool settings
 - `exercise/server.py` — Black-box flip server (reference for quirks, do not modify)
-- `exercise/tmprl/workflow.py` — Core workflow implementation
+- `exercise/workflows/workflow.py` — Core workflow implementation

@@ -59,7 +59,7 @@ in order to complete the exercise.
 ### The provided code
 - The server is provided as a black-box, you can't change it (server.py)
 - The temporal worker (worker.py) is another python file you should run, note that it only knows 
-  about the Workflow defined in `tmprl.workflow` once you have added new `activity` you must add 
+  about the Workflow defined in `workflows.workflow` once you have added new `activity` you must add 
   it to the `ACTIVITIES` the worker knows of.
 - The client (client.py) is provided as a way to interact with the server, you can change it as 
   needed (for example to add the queries)
