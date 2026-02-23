@@ -124,6 +124,70 @@ async def test_workflow_queries() -> None:
 
 
 @pytest.mark.asyncio
+async def test_workflow_queries_multi_batch() -> None:
+    """12 strings across 2 batches: strings_flipped=12, ok_responses=2."""
+    strings = [
+        "alpha",
+        "bravo",
+        "charlie",
+        "delta",
+        "echo",
+        "foxtrot",
+        "golf",
+        "hotel",
+        "india",
+        "juliet",
+        "kilo",
+        "lima",
+    ]
+
+    async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
+        async with temporalio.worker.Worker(
+            env.client,
+            task_queue="test",
+            workflows=[Flip],
+            activities=[mock_flip_batch_always_succeeds],
+        ):
+            handle = await env.client.start_workflow(
+                Flip.run,
+                Params(strings=strings),
+                id="test-queries-multi-batch",
+                task_queue="test",
+            )
+            await handle.result()
+
+            assert await handle.query(Flip.strings_flipped) == 12
+            assert await handle.query(Flip.ok_responses) == 2
+
+
+@pytest.mark.asyncio
+async def test_workflow_queries_with_partial_failures() -> None:
+    """Partial failure adds an extra round, increasing ok_responses."""
+    global _call_counter  # noqa: PLW0603
+    _call_counter = 0
+
+    async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
+        async with temporalio.worker.Worker(
+            env.client,
+            task_queue="test",
+            workflows=[Flip],
+            activities=[mock_flip_batch_partial_then_succeeds],
+        ):
+            handle = await env.client.start_workflow(
+                Flip.run,
+                Params(strings=["hello", "world"]),
+                id="test-queries-partial",
+                task_queue="test",
+            )
+            await handle.result()
+
+            # Round 1: 1 string flipped, 1 failed ("-") -> ok_responses=1
+            # Round 2: 1 remaining string flipped -> ok_responses=2
+            assert await handle.query(Flip.strings_flipped) == 2
+            assert await handle.query(Flip.ok_responses) == 2
+
+
+@pytest.mark.asyncio
 async def test_workflow_empty_input() -> None:
     async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
         async with temporalio.worker.Worker(
