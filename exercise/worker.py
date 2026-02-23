@@ -10,6 +10,8 @@ import temporalio.workflow
 
 from exercise import workflows
 
+logger = logging.getLogger(__name__)
+
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 interrupt_event = asyncio.Event()
@@ -19,9 +21,16 @@ WORKFLOWS = [workflows.Flip]
 
 
 async def main() -> None:
+    """Connect to Temporal and run the worker until interrupted."""
     logging.basicConfig(level=logging.INFO)
 
-    client = await temporalio.client.Client.connect(TEMPORAL_HOST)
+    try:
+        client = await temporalio.client.Client.connect(TEMPORAL_HOST)
+    except Exception:
+        logger.exception("Failed to connect to Temporal at %s", TEMPORAL_HOST)
+        raise
+
+    logger.info("Connected to Temporal at %s", TEMPORAL_HOST)
 
     async with temporalio.worker.Worker(
         client,
@@ -29,9 +38,9 @@ async def main() -> None:
         workflows=WORKFLOWS,
         activities=ACTIVITIES,
     ):
-        print("Worker started, ctrl+c to exit")
+        logger.info("Worker started, ctrl+c to exit")
         await interrupt_event.wait()
-        print("Shutting down")
+        logger.info("Shutting down")
 
 
 if __name__ == "__main__":

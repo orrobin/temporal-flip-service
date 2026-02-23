@@ -1,93 +1,140 @@
 # Flip Server Exercise
 
-## Excercise Description
+A Python service that uses [Temporal.io](https://temporal.io) to reliably flip strings via an unreliable HTTP server.
 
-You are given black-box "flip" server - a remote, unreliable & quirky server that flips strings. See [server quirks](#server-quirks) for more details.
+## Quick Start
 
-Your task is to utilize [temporal.io](https://temporal.io) to create a service that interacts with the server and reliably flips strings.
+```bash
+# Install dependencies
+poetry install
 
-### Requirements
+# Terminal 1 — Start local Temporal server
+temporal server start-dev
+
+# Terminal 2 — Start the flip server (black-box, do not modify)
+poetry run python exercise/server.py
+
+# Terminal 3 — Start the Temporal worker
+poetry run python exercise/worker.py
+
+# Terminal 4 — Run the client
+poetry run python exercise/client.py "hello" "world"
+```
+
+## Requirements
 
 1. Accept arbitrary number of strings to flip
-1. Reliably flip all of them
-1. Add temporal `query` for number of strings flipped so far (measures progress)
-1. Add temporal `query` for number of `HTTP 200 OK` responses recieved so far from the unreliable server (you can think of it as "how much real work we caused the unreliable flip server to do")
+2. Reliably flip all of them
+3. Temporal `query` for number of strings flipped so far (progress)
+4. Temporal `query` for number of `HTTP 200 OK` responses received (work tracking)
 
-The service is to be used as follows, with the included `client.py` -
-```bash
-$ poetry run python client.py "hello" "world"
-> "olleh" "dlrow"
-```
+## API Server
 
-#### Using the queries
-
-You'll need to use the `queries` you implemented. For that you'll be required to add code to `client.py`.
-The new code will run an asynchronous loop that will query the workflow, and print the results (every `n` seconds).
-
-#### Bonus points (ordered)
-1. Implement FastAPI server that wraps temporal, i.e. `POST /flip` with JSON body `["hello", "world"]` returns `["olleh", "dlrow"]`.
-1. Containerize the service
-1. Write Kubernetes deployment files
-
-These are bonus points, and are not required to complete the exercise. It's completely fine to submit the exercise without them.
-
-## Guidelines
-
-The code should be what you'd consider "Production Grade" python.
-
-This includes but is not limited to:
-- Proper error handling, logging, and testing
-- Typing, Linting, and Formatting
-- Documentation as needed
-
-Package your code in [poetry](https://python-poetry.org/), so that it can be easily installed.
-Provide a README.md with instructions on how to run the code.
-
-Deployment/docker/k8s is not needed for this exercise.
-
-### Temporal Docs
-A great part of this exercise is to learn some basic Temporal skills.
-You don't need to understand everything about Temporal, but you should be able to understand the below
-in order to complete the exercise.
-- The docs in the tutorials here should be enough for this exercise: https://learn.temporal.io/getting_started/
- - Note that there are multiple SDKs for temporal, we are working with Python.
- - The section about Temporal Cloud is not needed for this exercise.
-- There is some sample code in temporal SDK github repo: https://github.com/temporalio/samples-python
-- The Ask AI bot (in the bottom right of the docs page) can be helpful sometimes feel free to ask 
- it questions about the docs.
-
-### The provided code
-- The server is provided as a black-box, you can't change it (server.py)
-- The temporal worker (worker.py) is another python file you should run, note that it only knows 
-  about the Workflow defined in `workflows.workflow` once you have added new `activity` you must add 
-  it to the `ACTIVITIES` the worker knows of.
-- The client (client.py) is provided as a way to interact with the server, you can change it as 
-  needed (for example to add the queries)
-- `workflow.py` is a template for the workflow implementation, it contains a naive string 
-  flipping logic that does not interact with the server, you should replace that logic with one 
-  that interacts with the server of course.
-- The provided code should execute fine. In addition to the python code, make sure to run the local 
-  temporal server first. 
-
-## Using the server
-
-### How to run the server
+A FastAPI wrapper exposes the Temporal workflow over HTTP:
 
 ```bash
-poetry run python exercise/server.py
+# Start the API server
+poetry run python exercise/api.py
 ```
 
-### Sending a request
+**Endpoint:** `POST http://127.0.0.1:8080/flip`
 
 ```bash
-curl "http://127.0.0.1:8000/flip" -H "Content-Type: application/json" -d '["hello", "world"]'
+curl http://127.0.0.1:8080/flip \
+  -H "Content-Type: application/json" \
+  -d '["hello", "world"]'
+# => ["olleh", "dlrow"]
 ```
 
-### Server quirks
+## Docker Compose
 
-1. some requests may randomly fail (return code 500)
-1. requests take constant time to process
-1. the server accepts only lowercase a-z strings (else return code 400)
-1. the server might sometime fail to flip some strings (return code 200, in the response the 
-   failed strings will be `"-"`)
-1. the server accepts up to 10 strings at a time (else return code 400)
+Run the entire stack with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+This starts four services:
+- **temporal** — Temporal server (ports 7233, 8233)
+- **flip-server** — The unreliable flip server (port 8000)
+- **worker** — Temporal worker
+- **api** — FastAPI wrapper (port 8080)
+
+```bash
+# Test the API
+curl http://localhost:8080/flip \
+  -H "Content-Type: application/json" \
+  -d '["hello", "world"]'
+```
+
+## Kubernetes
+
+Kubernetes manifests are in `k8s/`. They deploy the same four services into a `flip` namespace.
+
+```bash
+# Build the image (for minikube, run `eval $(minikube docker-env)` first)
+docker build -t flip-exercise:latest .
+
+# Deploy
+kubectl apply -f k8s/
+
+# Check status
+kubectl -n flip get pods
+
+# Port-forward the API for local access
+kubectl -n flip port-forward svc/api 8080:8080
+```
+
+## Testing
+
+```bash
+# Run all tests
+poetry run pytest
+
+# Run specific test
+poetry run pytest -k "test_name"
+
+# Run with verbose output
+poetry run pytest -v
+```
+
+## Linting & Formatting
+
+```bash
+# Format code
+poetry run black .
+
+# Sort imports
+poetry run isort .
+
+# Lint
+poetry run pylint exercise/
+
+# Type check
+poetry run mypy exercise/
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TEMPORAL_HOST` | `localhost:7233` | Temporal server gRPC address |
+| `FLIP_SERVER_URL` | `http://127.0.0.1:8000/flip` | Flip server endpoint (worker only) |
+
+## Server Quirks
+
+The flip server (`exercise/server.py`) is a black-box with these behaviors:
+
+1. 10% chance of random 500 failure
+2. 5-second processing delay per request
+3. Only accepts lowercase a-z strings (else 400)
+4. 10% per-string chance of returning `"-"` instead of the flip (partial failure on 200)
+5. Max 10 strings per request (else 400)
+
+## Architecture
+
+- **`exercise/server.py`** — Black-box flip server (do not modify)
+- **`exercise/workflows/workflow.py`** — Temporal workflow and activity definitions
+- **`exercise/worker.py`** — Temporal worker process
+- **`exercise/client.py`** — CLI client with query polling
+- **`exercise/api.py`** — FastAPI wrapper around Temporal

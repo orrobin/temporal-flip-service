@@ -22,16 +22,22 @@ VALID_CHARS = set("abcdefghijklmnopqrstuvwxyz")
 
 @dataclasses.dataclass
 class Params:
+    """Input parameters for the Flip workflow."""
+
     strings: list[str]
 
 
 @dataclasses.dataclass
 class Result:
+    """Output of the Flip workflow containing flipped strings."""
+
     strings: list[str]
 
 
 @dataclasses.dataclass
 class BatchResult:
+    """Result of a single batch flip activity call."""
+
     strings: list[str]
 
 
@@ -62,6 +68,8 @@ async def flip_batch(batch: list[str]) -> BatchResult:
 
 @temporalio.workflow.defn(name="Flip", sandboxed=False)
 class Flip:
+    """Temporal workflow that reliably flips strings via an unreliable server."""
+
     def __init__(self) -> None:
         self._strings_flipped: int = 0
         self._ok_responses: int = 0
@@ -88,6 +96,7 @@ class Flip:
 
     @temporalio.workflow.run
     async def run(self, params: Params) -> Result:
+        """Execute the flip workflow: validate, batch, and retry until all strings are flipped."""
         self._validate_strings(params.strings)
 
         total = len(params.strings)

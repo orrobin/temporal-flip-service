@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "exercise"
 version = "0.1.0"
-description = ""
-authors = []
+description = "Reliable string-flipping service using Temporal.io"
+authors = ["Or Robin <orrobin5823@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import random
 import sys
@@ -6,6 +7,8 @@ import sys
 import temporalio.client
 
 from exercise import workflows
+
+logger = logging.getLogger(__name__)
 
 TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
@@ -19,9 +22,10 @@ async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
         try:
             flipped = await handle.query(workflows.Flip.strings_flipped)
             ok_responses = await handle.query(workflows.Flip.ok_responses)
-            print(
-                f"[progress] strings flipped: {flipped} | "
-                f"HTTP 200 responses: {ok_responses}"
+            logger.info(
+                "strings flipped: %d | HTTP 200 responses: %d",
+                flipped,
+                ok_responses,
             )
         except temporalio.client.WorkflowQueryFailedError:
             break
@@ -31,9 +35,14 @@ async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
 
 
 async def flip(to_flip: list[str]) -> list[str]:
-    client = await temporalio.client.Client.connect(
-        target_host=TEMPORAL_HOST,
-    )
+    """Start the Flip workflow, poll for progress, and return results."""
+    try:
+        client = await temporalio.client.Client.connect(
+            target_host=TEMPORAL_HOST,
+        )
+    except Exception:
+        logger.exception("Failed to connect to Temporal at %s", TEMPORAL_HOST)
+        raise
 
     handle = await client.start_workflow(
         workflows.Flip.run,
@@ -41,11 +50,15 @@ async def flip(to_flip: list[str]) -> list[str]:
         id=f"flip-{random.randint(0, 100000)}",
         task_queue="default",
     )
+    logger.info("Started workflow %s", handle.id)
 
     poll_task = asyncio.create_task(poll_progress(handle))
 
     try:
         result: workflows.Result = await handle.result()
+    except Exception:
+        logger.exception("Workflow %s failed", handle.id)
+        raise
     finally:
         poll_task.cancel()
         try:
@@ -53,15 +66,19 @@ async def flip(to_flip: list[str]) -> list[str]:
         except asyncio.CancelledError:
             pass
 
-    print(
-        f"[done] strings flipped: {len(result.strings)} | "
-        f"HTTP 200 responses: {await handle.query(workflows.Flip.ok_responses)}"
+    logger.info(
+        "Workflow %s completed: %d strings flipped, %d HTTP 200 responses",
+        handle.id,
+        len(result.strings),
+        await handle.query(workflows.Flip.ok_responses),
     )
 
     return result.strings
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
     if len(sys.argv) < 2:
         print("Usage: python client.py <string> [<string> ...]")
         sys.exit(1)
