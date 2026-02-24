@@ -16,6 +16,7 @@ TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 NUM_WORKFLOWS = 100
 STRINGS_PER_WORKFLOW = 100
 STRING_LENGTH = 8
+PROGRESS_LOG_INTERVAL = 10
 
 
 def generate_random_strings(count: int, length: int) -> list[str]:
@@ -68,7 +69,7 @@ async def collect_results(
                 mismatched += 1
                 logger.warning("MISMATCH in %s", wf_id)
 
-            if completed % 10 == 0:
+            if completed % PROGRESS_LOG_INTERVAL == 0:
                 elapsed = time.monotonic() - start
                 logger.info(
                     "%d/%d workflows completed [%.1fs]",

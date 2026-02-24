@@ -24,19 +24,21 @@ class _ClientHolder:
     client: temporalio.client.Client | None = field(default=None)
 
 
-_holder = _ClientHolder()
+_client_holder = _ClientHolder()
 
 
 async def get_temporal_client() -> temporalio.client.Client:
     """Return a cached Temporal client, connecting on first use."""
-    if _holder.client is None:
+    if _client_holder.client is None:
         try:
-            _holder.client = await temporalio.client.Client.connect(TEMPORAL_HOST)
+            _client_holder.client = await temporalio.client.Client.connect(
+                TEMPORAL_HOST
+            )
             logger.info("Connected to Temporal at %s", TEMPORAL_HOST)
         except OSError:
             logger.exception("Failed to connect to Temporal at %s", TEMPORAL_HOST)
             raise
-    return _holder.client
+    return _client_holder.client
 
 
 @app.post(

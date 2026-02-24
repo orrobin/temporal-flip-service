@@ -13,8 +13,13 @@ import temporalio.workflow
 logger = logging.getLogger(__name__)
 
 FLIP_SERVER_URL = os.environ.get("FLIP_SERVER_URL", "http://127.0.0.1:8000/flip")
+HTTP_TIMEOUT_SECONDS = 15.0
 MAX_BATCH_SIZE = 10
 ACTIVITY_START_TO_CLOSE_TIMEOUT = timedelta(seconds=30)
+
+RETRY_INITIAL_INTERVAL = timedelta(seconds=1)
+RETRY_BACKOFF_COEFFICIENT = 2.0
+RETRY_MAXIMUM_INTERVAL = timedelta(seconds=10)
 
 PARTIAL_FAILURE_MARKER = "-"
 VALID_CHARS = set("abcdefghijklmnopqrstuvwxyz")
@@ -49,7 +54,7 @@ async def flip_batch(batch: list[str]) -> BatchResult:
         response = await client.post(
             FLIP_SERVER_URL,
             json=batch,
-            timeout=15.0,
+            timeout=HTTP_TIMEOUT_SECONDS,
         )
 
     if response.status_code == 400:
@@ -100,14 +105,14 @@ class Flip:
         self._validate_strings(params.strings)
 
         total = len(params.strings)
-        results: list[str | None] = [None] * total
+        flipped_by_index: list[str | None] = [None] * total
         pending: list[tuple[int, str]] = list(enumerate(params.strings))
         round_number = 0
 
         retry_policy = temporalio.common.RetryPolicy(
-            initial_interval=timedelta(seconds=1),
-            backoff_coefficient=2.0,
-            maximum_interval=timedelta(seconds=10),
+            initial_interval=RETRY_INITIAL_INTERVAL,
+            backoff_coefficient=RETRY_BACKOFF_COEFFICIENT,
+            maximum_interval=RETRY_MAXIMUM_INTERVAL,
             maximum_attempts=0,  # unlimited
         )
 
@@ -119,14 +124,14 @@ class Flip:
                 len(pending),
                 total,
             )
-            pending = await self._execute_round(pending, results, retry_policy)
+            pending = await self._execute_round(pending, flipped_by_index, retry_policy)
 
-        return Result(strings=[s for s in results if s is not None])
+        return Result(strings=[s for s in flipped_by_index if s is not None])
 
     async def _execute_round(
         self,
         pending: list[tuple[int, str]],
-        results: list[str | None],
+        flipped_by_index: list[str | None],
         retry_policy: temporalio.common.RetryPolicy,
     ) -> list[tuple[int, str]]:
         """Execute one round of parallel batch flips, returning still-pending items."""
@@ -158,7 +163,7 @@ class Flip:
                     )
                     next_pending.append((orig_idx, orig_str))
                 else:
-                    results[orig_idx] = flipped
+                    flipped_by_index[orig_idx] = flipped
                     self._strings_flipped += 1
 
         return next_pending
