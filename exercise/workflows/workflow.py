@@ -44,7 +44,7 @@ class BatchResult:
 @temporalio.activity.defn
 async def flip_batch(batch: list[str]) -> BatchResult:
     """Call the flip server with a batch of strings (max 10)."""
-    logger.info("Sending batch of %d strings to flip server", len(batch))
+    logger.debug("Sending batch of %d strings to flip server", len(batch))
     async with httpx.AsyncClient() as client:
         response = await client.post(
             FLIP_SERVER_URL,
@@ -62,7 +62,7 @@ async def flip_batch(batch: list[str]) -> BatchResult:
     response.raise_for_status()
 
     result: list[str] = response.json()
-    logger.info("Received %d results from flip server", len(result))
+    logger.debug("Received %d results from flip server", len(result))
     return BatchResult(strings=result)
 
 
@@ -152,6 +152,10 @@ class Flip:
             self._ok_responses += 1
             for (orig_idx, orig_str), flipped in zip(batch, batch_result.strings):
                 if flipped == PARTIAL_FAILURE_MARKER:
+                    temporalio.workflow.logger.warning(
+                        "Partial failure for string at index %d, will retry",
+                        orig_idx,
+                    )
                     next_pending.append((orig_idx, orig_str))
                 else:
                     results[orig_idx] = flipped

@@ -26,7 +26,7 @@ async def main() -> None:
 
     try:
         client = await temporalio.client.Client.connect(TEMPORAL_HOST)
-    except Exception:
+    except OSError:
         logger.exception("Failed to connect to Temporal at %s", TEMPORAL_HOST)
         raise
 
@@ -40,7 +40,7 @@ async def main() -> None:
     ):
         logger.info("Worker started, ctrl+c to exit")
         await interrupt_event.wait()
-        logger.info("Shutting down")
+        logger.warning("Shutting down")
 
 
 if __name__ == "__main__":

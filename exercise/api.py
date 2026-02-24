@@ -1,6 +1,6 @@
 import logging
 import os
-import random
+import uuid
 from dataclasses import dataclass, field
 
 import temporalio.client
@@ -33,18 +33,25 @@ async def get_temporal_client() -> temporalio.client.Client:
         try:
             _holder.client = await temporalio.client.Client.connect(TEMPORAL_HOST)
             logger.info("Connected to Temporal at %s", TEMPORAL_HOST)
-        except Exception:
+        except OSError:
             logger.exception("Failed to connect to Temporal at %s", TEMPORAL_HOST)
             raise
     return _holder.client
 
 
-@app.post("/flip")
+@app.post(
+    "/flip",
+    responses={
+        422: {"description": "Workflow execution failed (e.g. invalid input)"},
+        500: {"description": "Unexpected internal server error"},
+        503: {"description": "Temporal service unavailable"},
+    },
+)
 async def flip(request: RootModel[list[str]]) -> RootModel[list[str]]:
     """Flip strings via the Temporal workflow."""
     try:
         client = await get_temporal_client()
-    except Exception:
+    except OSError:
         raise HTTPException(
             status_code=503, detail="Temporal service unavailable"
         ) from None
@@ -53,7 +60,7 @@ async def flip(request: RootModel[list[str]]) -> RootModel[list[str]]:
         result = await client.execute_workflow(
             workflows.Flip.run,
             workflows.Params(strings=request.root),
-            id=f"flip-api-{random.randint(0, 1_000_000)}",
+            id=f"flip-api-{uuid.uuid4().hex[:8]}",
             task_queue="default",
         )
     except temporalio.client.WorkflowFailureError as exc:

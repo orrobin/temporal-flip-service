@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 import random
 import string
 import time
@@ -6,6 +8,10 @@ import time
 import temporalio.client
 
 from exercise import workflows
+
+logger = logging.getLogger(__name__)
+
+TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 NUM_WORKFLOWS = 100
 STRINGS_PER_WORKFLOW = 100
@@ -39,7 +45,7 @@ async def collect_results(
     tasks: list[asyncio.Task[tuple[str, list[str], list[str], int, int]]],
     start: float,
 ) -> tuple[int, int, int, int]:
-    """Collect workflow results, printing per-workflow stats. Returns counters."""
+    """Collect workflow results, logging per-workflow stats. Returns counters."""
     completed = 0
     failed = 0
     mismatched = 0
@@ -51,45 +57,53 @@ async def collect_results(
             completed += 1
             total_ok_responses += ok_responses
 
-            print(
-                f"  [done] {wf_id}: strings flipped: {flipped} | "
-                f"HTTP 200 responses: {ok_responses}"
+            logger.info(
+                "[done] %s: strings flipped: %d | HTTP 200 responses: %d",
+                wf_id,
+                flipped,
+                ok_responses,
             )
 
             if outputs != [s[::-1] for s in inputs]:
                 mismatched += 1
-                print(f"  MISMATCH in {wf_id}")
+                logger.warning("MISMATCH in %s", wf_id)
 
             if completed % 10 == 0:
                 elapsed = time.monotonic() - start
-                print(
-                    f"  --- {completed}/{NUM_WORKFLOWS} "
-                    f"workflows completed [{elapsed:.1f}s] ---"
+                logger.info(
+                    "%d/%d workflows completed [%.1fs]",
+                    completed,
+                    NUM_WORKFLOWS,
+                    elapsed,
                 )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             failed += 1
-            print(f"  FAILED: {exc}")
+            logger.error("FAILED: %s", exc)
 
     return completed, failed, mismatched, total_ok_responses
 
 
 async def main() -> None:
-    client = await temporalio.client.Client.connect("localhost:7233")
+    """Run load test: launch many workflows concurrently and report results."""
+    logging.basicConfig(level=logging.INFO)
 
-    workflows: list[tuple[str, list[str]]] = [
+    client = await temporalio.client.Client.connect(TEMPORAL_HOST)
+
+    workflow_inputs: list[tuple[str, list[str]]] = [
         (f"load-test-{i}", generate_random_strings(STRINGS_PER_WORKFLOW, STRING_LENGTH))
         for i in range(NUM_WORKFLOWS)
     ]
 
-    print(
-        f"Starting {NUM_WORKFLOWS} workflows, "
-        f"each with {STRINGS_PER_WORKFLOW} strings..."
+    logger.info(
+        "Starting %d workflows, each with %d strings...",
+        NUM_WORKFLOWS,
+        STRINGS_PER_WORKFLOW,
     )
     start = time.monotonic()
 
     tasks = [
         asyncio.create_task(run_workflow(client, wf_id, strings))
-        for wf_id, strings in workflows
+        for wf_id, strings in workflow_inputs
     ]
 
     completed, failed, mismatched, total_ok_responses = await collect_results(
@@ -99,13 +113,13 @@ async def main() -> None:
     elapsed = time.monotonic() - start
     total_strings = NUM_WORKFLOWS * STRINGS_PER_WORKFLOW
 
-    print("\n--- Results ---")
-    print(f"Workflows:    {completed} completed, {failed} failed")
-    print(f"Mismatches:   {mismatched}")
-    print(f"Strings:      {total_strings} total")
-    print(f"HTTP 200s:    {total_ok_responses} total")
-    print(f"Duration:     {elapsed:.1f}s")
-    print(f"Throughput:   {total_strings / elapsed:.1f} strings/s")
+    logger.info("--- Results ---")
+    logger.info("Workflows:    %d completed, %d failed", completed, failed)
+    logger.info("Mismatches:   %d", mismatched)
+    logger.info("Strings:      %d total", total_strings)
+    logger.info("HTTP 200s:    %d total", total_ok_responses)
+    logger.info("Duration:     %.1fs", elapsed)
+    logger.info("Throughput:   %.1f strings/s", total_strings / elapsed)
 
 
 if __name__ == "__main__":

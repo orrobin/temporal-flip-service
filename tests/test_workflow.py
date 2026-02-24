@@ -6,8 +6,8 @@ import temporalio.worker
 
 from exercise.workflows.workflow import BatchResult, Flip, Params
 
-# Track call count to simulate partial failures then success
-_call_counter: int = 0
+# Mutable counter to track calls across activity invocations
+_call_count: list[int] = [0]
 
 
 @temporalio.activity.defn(name="flip_batch")
@@ -18,9 +18,8 @@ async def mock_flip_batch_always_succeeds(batch: list[str]) -> BatchResult:
 @temporalio.activity.defn(name="flip_batch")
 async def mock_flip_batch_partial_then_succeeds(batch: list[str]) -> BatchResult:
     """First call returns '-' for the second string, second call succeeds."""
-    global _call_counter  # noqa: PLW0603
-    _call_counter += 1
-    if _call_counter == 1:
+    _call_count[0] += 1
+    if _call_count[0] == 1:
         results = ["-" if i == 1 else s[::-1] for i, s in enumerate(batch)]
         return BatchResult(strings=results)
     return BatchResult(strings=[s[::-1] for s in batch])
@@ -80,8 +79,7 @@ async def test_workflow_multi_batch() -> None:
 
 @pytest.mark.asyncio
 async def test_workflow_retries_partial_failures() -> None:
-    global _call_counter  # noqa: PLW0603
-    _call_counter = 0
+    _call_count[0] = 0
 
     async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
         async with temporalio.worker.Worker(
@@ -163,8 +161,7 @@ async def test_workflow_queries_multi_batch() -> None:
 @pytest.mark.asyncio
 async def test_workflow_queries_with_partial_failures() -> None:
     """Partial failure adds an extra round, increasing ok_responses."""
-    global _call_counter  # noqa: PLW0603
-    _call_counter = 0
+    _call_count[0] = 0
 
     async with await temporalio.testing.WorkflowEnvironment.start_local() as env:
         async with temporalio.worker.Worker(

@@ -1,8 +1,9 @@
 import asyncio
+import contextlib
 import logging
 import os
-import random
 import sys
+import uuid
 
 import temporalio.client
 
@@ -22,7 +23,7 @@ async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
         try:
             flipped = await handle.query(workflows.Flip.strings_flipped)
             ok_responses = await handle.query(workflows.Flip.ok_responses)
-            logger.info(
+            logger.debug(
                 "strings flipped: %d | HTTP 200 responses: %d",
                 flipped,
                 ok_responses,
@@ -40,14 +41,14 @@ async def flip(to_flip: list[str]) -> list[str]:
         client = await temporalio.client.Client.connect(
             target_host=TEMPORAL_HOST,
         )
-    except Exception:
+    except OSError:
         logger.exception("Failed to connect to Temporal at %s", TEMPORAL_HOST)
         raise
 
     handle = await client.start_workflow(
         workflows.Flip.run,
         workflows.Params(strings=to_flip),
-        id=f"flip-{random.randint(0, 100000)}",
+        id=f"flip-{uuid.uuid4().hex[:8]}",
         task_queue="default",
     )
     logger.info("Started workflow %s", handle.id)
@@ -61,10 +62,8 @@ async def flip(to_flip: list[str]) -> list[str]:
         raise
     finally:
         poll_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await poll_task
-        except asyncio.CancelledError:
-            pass
 
     logger.info(
         "Workflow %s completed: %d strings flipped, %d HTTP 200 responses",
