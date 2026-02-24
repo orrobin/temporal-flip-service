@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import random
 import string
 import time
@@ -8,10 +7,9 @@ import time
 import temporalio.client
 
 from exercise import workflows
+from exercise.config import TASK_QUEUE, TEMPORAL_HOST
 
 logger = logging.getLogger(__name__)
-
-TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 NUM_WORKFLOWS = 100
 STRINGS_PER_WORKFLOW = 100
@@ -35,7 +33,7 @@ async def run_workflow(
         workflows.Flip.run,
         workflows.Params(strings=strings),
         id=workflow_id,
-        task_queue="default",
+        task_queue=TASK_QUEUE,
     )
     result = await handle.result()
     ok_responses = await handle.query(workflows.Flip.ok_responses)

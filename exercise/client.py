@@ -1,17 +1,16 @@
 import asyncio
 import contextlib
 import logging
-import os
 import sys
 import uuid
 
 import temporalio.client
+import temporalio.service
 
 from exercise import workflows
+from exercise.config import TASK_QUEUE, TEMPORAL_HOST
 
 logger = logging.getLogger(__name__)
-
-TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 POLL_INTERVAL_SECONDS = 2
 
@@ -28,9 +27,10 @@ async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
                 flipped,
                 ok_responses,
             )
-        except temporalio.client.WorkflowQueryFailedError:
-            break
-        except Exception:  # pylint: disable=broad-exception-caught
+        except (
+            temporalio.client.WorkflowQueryFailedError,
+            temporalio.service.RPCError,
+        ):
             # Workflow may have completed between iterations
             break
 
@@ -49,7 +49,7 @@ async def flip(to_flip: list[str]) -> list[str]:
         workflows.Flip.run,
         workflows.Params(strings=to_flip),
         id=f"flip-{uuid.uuid4().hex[:8]}",
-        task_queue="default",
+        task_queue=TASK_QUEUE,
     )
     logger.info("Started workflow %s", handle.id)
 

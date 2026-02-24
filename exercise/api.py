@@ -1,5 +1,4 @@
 import logging
-import os
 import uuid
 from dataclasses import dataclass, field
 
@@ -9,10 +8,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import RootModel
 
 from exercise import workflows
+from exercise.config import TASK_QUEUE, TEMPORAL_HOST
 
 logger = logging.getLogger(__name__)
-
-TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 app = FastAPI(title="Flip API")
 
@@ -63,7 +61,7 @@ async def flip(request: RootModel[list[str]]) -> RootModel[list[str]]:
             workflows.Flip.run,
             workflows.Params(strings=request.root),
             id=f"flip-api-{uuid.uuid4().hex[:8]}",
-            task_queue="default",
+            task_queue=TASK_QUEUE,
         )
     except temporalio.client.WorkflowFailureError as exc:
         logger.error("Workflow failed: %s", exc)

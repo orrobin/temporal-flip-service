@@ -1,3 +1,3 @@
-from . import workflows
+from . import config, workflows
 
-__all__ = ["workflows"]
+__all__ = ["config", "workflows"]

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from collections.abc import Callable
 from typing import Any
 
@@ -9,10 +8,9 @@ import temporalio.worker
 import temporalio.workflow
 
 from exercise import workflows
+from exercise.config import TASK_QUEUE, TEMPORAL_HOST
 
 logger = logging.getLogger(__name__)
-
-TEMPORAL_HOST = os.environ.get("TEMPORAL_HOST", "localhost:7233")
 
 interrupt_event = asyncio.Event()
 
@@ -34,7 +32,7 @@ async def main() -> None:
 
     async with temporalio.worker.Worker(
         client,
-        task_queue="default",
+        task_queue=TASK_QUEUE,
         workflows=WORKFLOWS,
         activities=ACTIVITIES,
     ):
