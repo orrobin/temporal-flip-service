@@ -15,26 +15,6 @@ logger = logging.getLogger(__name__)
 POLL_INTERVAL_SECONDS = 2
 
 
-async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
-    """Query the workflow for progress and print it periodically."""
-    while True:
-        await asyncio.sleep(POLL_INTERVAL_SECONDS)
-        try:
-            flipped = await handle.query(workflows.Flip.strings_flipped)
-            ok_responses = await handle.query(workflows.Flip.ok_responses)
-            logger.debug(
-                "strings flipped: %d | HTTP 200 responses: %d",
-                flipped,
-                ok_responses,
-            )
-        except (
-            temporalio.client.WorkflowQueryFailedError,
-            temporalio.service.RPCError,
-        ):
-            # Workflow may have completed between iterations
-            break
-
-
 async def flip(to_flip: list[str]) -> list[str]:
     """Start the Flip workflow, poll for progress, and return results."""
     try:
@@ -73,6 +53,26 @@ async def flip(to_flip: list[str]) -> list[str]:
     )
 
     return result.strings
+
+
+async def poll_progress(handle: temporalio.client.WorkflowHandle) -> None:
+    """Query the workflow for progress and print it periodically."""
+    while True:
+        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        try:
+            flipped = await handle.query(workflows.Flip.strings_flipped)
+            ok_responses = await handle.query(workflows.Flip.ok_responses)
+            logger.debug(
+                "strings flipped: %d | HTTP 200 responses: %d",
+                flipped,
+                ok_responses,
+            )
+        except (
+            temporalio.client.WorkflowQueryFailedError,
+            temporalio.service.RPCError,
+        ):
+            # Workflow may have completed between iterations
+            break
 
 
 if __name__ == "__main__":
