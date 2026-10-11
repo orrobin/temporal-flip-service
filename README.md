@@ -1,116 +1,78 @@
-# Flip Server Exercise
+# Temporal Flip Service
 
-A Python service that uses [Temporal.io](https://temporal.io) to reliably flip strings via an unreliable HTTP server.
+Reliable processing on top of an unreliable HTTP service, built with durable [Temporal](https://temporal.io) workflows.
 
-## Quick Start
+The downstream service (simulated in `exercise/server.py`) is deliberately hostile: it randomly returns HTTP 500, takes 5 seconds per request, accepts at most 10 strings per call, rejects anything that is not lowercase a to z, and sometimes returns HTTP 200 with a corrupted result for individual items. This service turns any number of input strings into a guaranteed, complete result anyway.
+
+## How it works
+
+- **Validation up front.** Invalid input fails fast as a non retryable error, so the workflow never loops on requests that can never succeed.
+- **Batching and parallelism.** Pending strings are split into batches of 10 and sent concurrently as Temporal activities.
+- **Retries with backoff.** Transport errors and HTTP 500s are retried by a Temporal retry policy with exponential backoff and a 30 second activity timeout.
+- **Partial failure recovery.** A 200 response is not trusted blindly. Items that come back corrupted are tracked by their original index and sent again in the next round, until every string is flipped, with output order preserved.
+- **Live progress.** Two Temporal queries expose progress while the workflow runs: strings flipped so far and successful HTTP responses received.
+- **Durability.** Because state lives in the workflow, a worker crash or restart resumes the job instead of losing it.
+
+## Stack
+
+Python 3.11, Temporal, FastAPI, httpx, Docker Compose, Kubernetes, pytest (unit, workflow and load tests), black, isort, pylint, mypy
+
+## Quick start
 
 ```bash
-# Install dependencies
 poetry install
 
-# Terminal 1 — Start local Temporal server
+# Terminal 1: local Temporal server
 temporal server start-dev
 
-# Terminal 2 — Start the flip server (black-box, do not modify)
+# Terminal 2: the unreliable downstream service
 poetry run python exercise/server.py
 
-# Terminal 3 — Start the Temporal worker
+# Terminal 3: Temporal worker
 poetry run python exercise/worker.py
 
-# Terminal 4 — Run the client
+# Terminal 4: run a job from the CLI (polls progress queries while it runs)
 poetry run python exercise/client.py "hello" "world"
 ```
 
-## Requirements
-
-1. Accept arbitrary number of strings to flip
-2. Reliably flip all of them
-3. Temporal `query` for number of strings flipped so far (progress)
-4. Temporal `query` for number of `HTTP 200 OK` responses received (work tracking)
-
-## API Server
-
-A FastAPI wrapper exposes the Temporal workflow over HTTP:
+### HTTP API
 
 ```bash
-# Start the API server
 poetry run python exercise/api.py
-```
 
-**Endpoint:** `POST http://127.0.0.1:8080/flip`
-
-```bash
 curl http://127.0.0.1:8080/flip \
   -H "Content-Type: application/json" \
   -d '["hello", "world"]'
 # => ["olleh", "dlrow"]
 ```
 
-## Docker Compose
-
-Run the entire stack with Docker Compose:
+### Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-This starts four services:
-- **temporal** — Temporal server (ports 7233, 8233)
-- **flip-server** — The unreliable flip server (port 8000)
-- **worker** — Temporal worker
-- **api** — FastAPI wrapper (port 8080)
+Starts four services: `temporal` (7233, 8233), `flip-server` (8000), `worker`, and `api` (8080).
+
+### Kubernetes
+
+Manifests in `k8s/` deploy the same four services into a `flip` namespace.
 
 ```bash
-# Test the API
-curl http://localhost:8080/flip \
-  -H "Content-Type: application/json" \
-  -d '["hello", "world"]'
-```
-
-## Kubernetes
-
-Kubernetes manifests are in `k8s/`. They deploy the same four services into a `flip` namespace.
-
-```bash
-# Build the image (for minikube, run `eval $(minikube docker-env)` first)
-docker build -t flip-exercise:latest .
-
-# Deploy
+docker build -t flip-exercise:latest .   # for minikube, run: eval $(minikube docker-env)
 kubectl apply -f k8s/
-
-# Check status
 kubectl -n flip get pods
-
-# Port-forward the API for local access
 kubectl -n flip port-forward svc/api 8080:8080
 ```
 
-## Testing
+## Testing and code quality
 
 ```bash
-# Run all tests
-poetry run pytest
+poetry run pytest -v              # activity and workflow tests
+poetry run python tests/load_test.py
 
-# Run specific test
-poetry run pytest -k "test_name"
-
-# Run with verbose output
-poetry run pytest -v
-```
-
-## Linting & Formatting
-
-```bash
-# Format code
-poetry run black .
-
-# Sort imports
-poetry run isort .
-
-# Lint
+poetry run black . && poetry run isort .
 poetry run pylint exercise/
-
-# Type check
 poetry run mypy exercise/
 ```
 
@@ -119,22 +81,16 @@ poetry run mypy exercise/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TEMPORAL_HOST` | `localhost:7233` | Temporal server gRPC address |
-| `FLIP_SERVER_URL` | `http://127.0.0.1:8000/flip` | Flip server endpoint (worker only) |
+| `FLIP_SERVER_URL` | `http://127.0.0.1:8000/flip` | Downstream service endpoint (worker only) |
 
-## Server Quirks
+## Project layout
 
-The flip server (`exercise/server.py`) is a black-box with these behaviors:
-
-1. 10% chance of random 500 failure
-2. 5-second processing delay per request
-3. Only accepts lowercase a-z strings (else 400)
-4. 10% per-string chance of returning `"-"` instead of the flip (partial failure on 200)
-5. Max 10 strings per request (else 400)
-
-## Architecture
-
-- **`exercise/server.py`** — Black-box flip server (do not modify)
-- **`exercise/workflows/workflow.py`** — Temporal workflow and activity definitions
-- **`exercise/worker.py`** — Temporal worker process
-- **`exercise/client.py`** — CLI client with query polling
-- **`exercise/api.py`** — FastAPI wrapper around Temporal
+| Path | Purpose |
+|------|---------|
+| `exercise/workflows/workflow.py` | Workflow, activity, retry policy and progress queries |
+| `exercise/worker.py` | Temporal worker process |
+| `exercise/client.py` | CLI client with live progress polling |
+| `exercise/api.py` | FastAPI wrapper around the workflow |
+| `exercise/server.py` | Simulated unreliable downstream service |
+| `tests/` | Unit, workflow and load tests |
+| `k8s/` | Kubernetes manifests |
